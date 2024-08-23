@@ -1,0 +1,31 @@
+# Ultralytics YOLOv5 🚀, AGPL-3.0 license
+# ImageNet-1k dataset https://www.image-net.org/index.php by Stanford University
+# Simplified class names from https://github.com/anishathalye/imagenet-simple-labels
+# Example usage: python classify/train.py --data imagenet
+# parent
+# ├── data
+# └── datasets
+#     └── cifar-10  ← downloads here
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: ../datasets/cifar-10_tiny # dataset root dir
+train: train # train images (relative to 'path') 1,000 images
+val:   # test images (optional)
+test: test # test images (relative to 'path') 5 images
+
+# Classes
+names:
+  0: airplane
+  1: automobile
+  2: bird
+  3: cat
+  4: deer
+  5: dog
+  6: frog
+  7: horse
+  8: ship
+  9: truck
+
+# Download script/URL (optional)
+download: http://d2l-data.s3-accelerate.amazonaws.com/cifar-10_tiny.zip
+
