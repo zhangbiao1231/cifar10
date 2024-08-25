@@ -8,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
+import torch.nn as nn
 import torch.distributed as dist
-import val as validate
 import torch.hub as hub
 import torch.optim.lr_scheduler as lr_scheduler
 import torchvision
@@ -49,6 +49,7 @@ from utils.torch_utils import (
     reshape_classifier_output,
     select_device,
     smart_optimizer,
+    smart_resume,
     smartCrossEntropyLoss,
     torch_distributed_zero_first,
     de_parallel,
@@ -61,11 +62,13 @@ WORLD_SIZE = int(os.getenv("WORLD_SIZE", 1))
 def train(opt,device):
     """Trains a YOLOv5 model, managing datasets, model optimization, logging, and saving checkpoints."""
     init_seeds(opt.seed + 1 + RANK, deterministic=True)
-    save_dir, data, bs,  epochs, nw, imgsz, pretrained = (
+    save_dir, weights, data, bs,  epochs, resume, nw, imgsz, pretrained = (
         opt.save_dir,
+        opt.weights,
         Path(opt.data),
         opt.batch_size,
         opt.epochs,
+        opt.resume,
         min(os.cpu_count() - 1, opt.workers),
         opt.imgsz,
         str(opt.pretrained).lower() == "true",
@@ -108,29 +111,46 @@ def train(opt,device):
         cache=opt.cache,
         rank=LOCAL_RANK,
         workers=nw,
+        shuffle=True,
     )
-    valid_dir = data_dir / "train_valid_test/valid" if ( data_dir / "train_valid_test/valid").exists() else  data_dir / "train_valid_test/test"
+    valid_dir = data_dir / "train_valid_test/valid" if (data_dir / "train_valid_test/valid").exists() else  data_dir / "train_valid_test/test"
     if RANK in {-1,0}:
         validloader = create_classification_dataloader(
             path=valid_dir,
             imgsz=imgsz,
             batch_size=bs // WORLD_SIZE * 2,
-            augment=True,
+            augment=False,
             cache=opt.cache,
             rank=LOCAL_RANK,
             workers=nw,
+            shuffle=False,
     )
     # Model
-    with torch_distributed_zero_first(LOCAL_RANK), WorkingDirectory(ROOT):
-        if Path(opt.model).is_file() or opt.model.endswith(".pt"):
-            model = attempt_load(opt.model, device=device, fuse=False) #TODO
-        elif opt.model in torchvision.models.__dict__:# TorchVision models i.e. resnet50, efficientnet_b0
-            model = torchvision.models.__dict__[opt.model](weights="IMAGENET1K_V1" if pretrained else None)
-        else:
-            m = hub.list("ultralytics/yolov5")  # + hub.list('pytorch/vision')  # models
-            raise ModuleNotFoundError(f"--model {opt.model} not found. Available models are: \n" + "\n".join(m))
-        reshape_classifier_output(model,nc) # update class count
-
+    pretrained = str(weights).endswith(".pt")
+    if pretrained:
+        # ckpt = torch.load(weights, map_location="cpu")  # load checkpoint to CPU to avoid CUDA memory leak
+        # # model = get_net(name=opt.model).to(device)  # create
+        # exclude = []  # exclude keys
+        # csd = ckpt["model"].float().state_dict()  # checkpoint state_dict as FP32
+        # # csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
+        # model.load_state_dict(csd, strict=False)  # load
+        # LOGGER.info(f"Transferred {len(csd)}/{len(model.state_dict())} items from {weights}")  # report
+        model = nn.ModuleList()
+        file = Path(str(weights).strip().replace("'", ""))
+        ckpt = torch.load(file, map_location="cpu")  # load
+        csd = ckpt["model"].to(device).float()  # FP32 model
+        model.append(csd.eval())
+        model = model[-1]
+    else:
+        with torch_distributed_zero_first(LOCAL_RANK), WorkingDirectory(ROOT):
+            if Path(opt.model).is_file() or opt.model.endswith(".pt"):
+                model = attempt_load(opt.model, device=device, fuse=False)
+            elif opt.model in torchvision.models.__dict__:# TorchVision models i.e. resnet50, efficientnet_b0
+                model = torchvision.models.__dict__[opt.model](weights=None)
+            else:
+                m = hub.list("ultralytics/yolov5")  # + hub.list('pytorch/vision')  # models
+                raise ModuleNotFoundError(f"--model {opt.model} not found. Available models are: \n" + "\n".join(m))
+            reshape_classifier_output(model,nc) # update class count
     for p in model.parameters():
         p.requires_grad = True  # for training
     model = model.to(device)
@@ -143,7 +163,7 @@ def train(opt,device):
         if opt.verbose:
             LOGGER.info(model)
         images, labels = next(iter(trainloader))
-        file = imshow_cls(images[:25], labels[:25], names=model.names, f=save_dir / "train_images.jpg")
+        file = imshow_cls(images[:16], labels[:16], names=model.names, f=save_dir / "train_images.jpg")
         logger.log_images(file, name="Train Examples")
         logger.log_graph(model, imgsz)  # log model
 
@@ -165,6 +185,13 @@ def train(opt,device):
     # EMA
     ema = ModelEMA(model) if RANK in {-1, 0} else None
 
+    # Resume
+    best_fitness, start_epoch = 0.0, 0
+    if pretrained:
+        if resume:
+            best_fitness, start_epoch, epochs = smart_resume(ckpt, optimizer, ema, weights, epochs, resume)
+        del ckpt, csd
+
     # Train
     t0 = time.time()
     criterion = smartCrossEntropyLoss(label_smoothing=opt.label_smoothing)  # loss function
@@ -178,7 +205,7 @@ def train(opt,device):
         f'Starting {opt.model} training on {data} dataset with {nc} classes for {epochs} epochs...\n\n'
         f"{'Epoch':>10}{'GPU_mem':>10}{'train_loss':>12}{f'{val}_loss':>12}{'top1_acc':>12}{'top5_acc':>12}"
     )
-    for epoch in range(epochs):  # loop over the dataset multiple times
+    for epoch in range(start_epoch,epochs):  # loop over the dataset multiple times
         tloss, vloss, fitness = 0.0, 0.0, 0.0  # train loss, val loss, fitness
         model.train()
         if RANK != -1:
@@ -274,9 +301,9 @@ def train(opt,device):
         file = imshow_cls(images, labels, pred, de_parallel(model).names, verbose=False, f=save_dir / "test_images.jpg")
 
         # Log results
-        meta = {"epochs": epochs, "top1_acc": best_fitness, "date": datetime.now().isoformat()}
+        # meta = {"epochs": epochs, "top1_acc": best_fitness, "date": datetime.now().isoformat()}
         logger.log_images(file, name="Test Examples (true-predicted)", epoch=epoch)
-        logger.log_model(best, epochs, metadata=meta)
+        # logger.log_model(best, epochs, metadata=meta)
 
 def parse_opt(known=False):
     """Parses command line arguments for YOLOv5 training including model path, dataset, epochs, and more, returning
@@ -284,8 +311,11 @@ def parse_opt(known=False):
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="resnet18", help="initial weights path")
+    parser.add_argument("--weights", nargs="+", type=str,default=ROOT / "runs/train-cls/exp6/weights/last.pt",
+                        help="model.pt path(s)")
     parser.add_argument("--data", type=str, default="cifar10", help="cifar100, mnist, imagenet, ...")
     parser.add_argument("--epochs", type=int, default=10, help="total training epochs")
+    parser.add_argument("--resume", nargs="?", const=True, default=False, help="resume most recent training")
     parser.add_argument("--batch-size", type=int, default=64, help="total batch size for all GPUs")
     parser.add_argument("--imgsz", "--img", "--img-size", type=int, default=32, help="train, val image size (pixels)")
     parser.add_argument("--nosave", action="store_true", help="only save final checkpoint")

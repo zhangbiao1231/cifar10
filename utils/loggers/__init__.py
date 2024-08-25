@@ -6,6 +6,8 @@ import os
 import warnings
 from pathlib import Path
 
+# import matplotlib.image as mpimg
+
 
 import torch
 
@@ -101,10 +103,15 @@ class GenericLogger:
         """Logs images to all loggers with optional naming and epoch specification."""
         files = [Path(f) for f in (files if isinstance(files, (tuple, list)) else [files])]  # to Path
         files = [f for f in files if f.exists()]  # filter by exists
+        from matplotlib import image as mpimg
 
         if self.tb:
             for f in files:
-                self.tb.add_image(f.stem, cv2.imread(str(f))[..., ::-1], epoch, dataformats="HWC")
+                self.tb.add_image(tag=f.stem,
+                                  # img_tensor=cv2.imread(str(f))[..., ::-1],
+                                  img_tensor=mpimg.imread(str(f)),
+                                  global_step=epoch,
+                                  dataformats="HWC")
     def log_graph(self, model, imgsz=(640, 640)):
         """Logs model graph to all configured loggers with specified input image size."""
         if self.tb:

@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 import torch
+import torch.nn as nn
 from tqdm import tqdm
 
 FILE = Path(__file__).resolve()
@@ -51,10 +52,10 @@ from utils.torch_utils import select_device, smart_inference_mode
 
 @smart_inference_mode()
 def run(
-    data=ROOT / "../datasets/mnist",  # dataset dir
-    weights=ROOT / "yolov5s-cls.pt",  # model.pt path(s)
+    data=ROOT / "data/datasets/cifar10/train_valid_test",  # dataset dir
+    weights=ROOT / "runs/train-cls/exp2/weights/last.pt",  # model.pt path(s)
     batch_size=128,  # batch size
-    imgsz=224,  # inference size (pixels)
+    imgsz=32,  # inference size (pixels)
     device="",  # cuda device, i.e. 0 or 0,1,2,3 or cpu
     workers=8,  # max dataloader workers (per RANK in DDP mode)
     verbose=False,  # verbose output
@@ -81,25 +82,29 @@ def run(
         # Directories
         save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
         save_dir.mkdir(parents=True, exist_ok=True)  # make dir
+        csv = save_dir / "results.csv"
+
 
         # Load model
-        model = DetectMultiBackend(weights, device=device, dnn=dnn, fp16=half)
-        stride, pt, jit, engine = model.stride, model.pt, model.jit, model.engine
-        # imgsz = check_img_size(imgsz, s=stride)  # check image size
-        half = model.fp16  # FP16 supported on limited backends with CUDA
-        if engine:
-            batch_size = model.batch_size
-        else:
-            device = model.device
-            if not (pt or jit):
-                batch_size = 1  # export.py models default to batch-size 1
-                LOGGER.info(f"Forcing --batch-size 1 square inference (1,3,{imgsz},{imgsz}) for non-PyTorch models")
+        model = nn.ModuleList()
+        file = Path(str(weights).strip().replace("'", ""))
+        ckpt = torch.load(file, map_location="cpu")  # load
+        ckpt = (ckpt["model"]).to(device).float()  # FP32 model
+        model.append(ckpt.eval())
+        model = model[-1]
+
 
         # Dataloader
         data = Path(data)
-        test_dir = data / "test" if (data / "test").exists() else data / "val"  # data/test or data/val
+        valid_dir = data / "valid" if (data / "valid").exists() else data / "test"  # data/test or data/val
         dataloader = create_classification_dataloader(
-            path=test_dir, imgsz=imgsz, batch_size=batch_size, augment=False, rank=-1, workers=workers
+            path=valid_dir,
+            imgsz=imgsz,
+            batch_size=batch_size,
+            augment=False,
+            rank=-1,
+            workers=workers,
+            shuffle=False,
         )
 
     model.eval()
@@ -133,25 +138,38 @@ def run(
     if verbose:  # all classes
         LOGGER.info(f"{'Class':>24}{'Images':>12}{'top1_acc':>12}{'top5_acc':>12}")
         LOGGER.info(f"{'all':>24}{targets.shape[0]:>12}{top1:>12.3g}{top5:>12.3g}")
-        for i, c in model.names.items():
+        for i, c in enumerate(model.names):# for i, c in enumerate(dataloader.dataset.classes):
             acc_i = acc[targets == i]
             top1i, top5i = acc_i.mean(0).tolist()
             LOGGER.info(f"{c:>24}{acc_i.shape[0]:>12}{top1i:>12.3g}{top5i:>12.3g}")
+            # Log
+            metrics = {
+                "Labels": c,
+                "Images": acc_i.shape[0],
+                "metrics/accuracy_top1": top1i,
+                "metrics/accuracy_top5": top5i,
+            }  # learning rate
+
+            keys, vals = list(metrics.keys()), list(metrics.values())
+            n = len(metrics) + 1  # number of cols
+            s = "" if csv.exists() else (("%30s," * n % tuple(["Classes"] + keys)).rstrip(",") + "\n")  # header
+            with open(csv, "a") as f:
+                f.write(s + ("%30.5g," % i) +
+                        ("%30s," % vals[0]) +
+                        ("%30.5g," * (n - 2) % tuple(vals[1:])).rstrip(",") + "\n")
 
         # Print results
         t = tuple(x.t / len(dataloader.dataset.samples) * 1e3 for x in dt)  # speeds per image
         shape = (1, 3, imgsz, imgsz)
         LOGGER.info(f"Speed: %.1fms pre-process, %.1fms inference, %.1fms post-process per image at shape {shape}" % t)
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}")
-
     return top1, top5, loss
-
 
 def parse_opt():
     """Parses and returns command line arguments for YOLOv5 model evaluation and inference settings."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", type=str, default=ROOT / "data/datasets/mnist", help="dataset path")
-    parser.add_argument("--weights", nargs="+", type=str, default=ROOT / "yolov5s-cls.pt", help="model.pt path(s)")
+    parser.add_argument("--data", type=str, default=ROOT / "data/datasets/cifar10/train_valid_test", help="dataset path")
+    parser.add_argument("--weights", nargs="+", type=str, default=ROOT / "runs/train-cls/exp2/weights/last.pt", help="model.pt path(s)")
     parser.add_argument("--batch-size", type=int, default=128, help="batch size")
     parser.add_argument("--imgsz", "--img", "--img-size", type=int, default=32, help="inference size (pixels)")
     parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu")
@@ -169,7 +187,7 @@ def parse_opt():
 
 def main(opt):
     """Executes the YOLOv5 model prediction workflow, handling argument parsing and requirement checks."""
-    check_requirements(ROOT / "requirements.txt", exclude=("tensorboard", "thop"))
+    # check_requirements(ROOT / "requirements.txt", exclude=("tensorboard", "thop"))
     run(**vars(opt))
 
 

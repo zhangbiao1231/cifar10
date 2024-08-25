@@ -287,8 +287,8 @@ def smart_resume(ckpt, optimizer, ema=None, weights="yolov5s.pt", epochs=300, re
         )
         LOGGER.info(f"Resuming training from {weights} from epoch {start_epoch} to {epochs} total epochs")
     if epochs < start_epoch:
-        LOGGER.info(f"{weights} has been trained for {ckpt['epoch']} epochs. Fine-tuning for {epochs} more epochs.")
-        epochs += ckpt["epoch"]  # finetune additional epochs
+        LOGGER.info(f"{weights} has been trained for {start_epoch} epochs. Fine-tuning for {epochs} more epochs.")
+        epochs += start_epoch  # finetune additional epochs
     return best_fitness, start_epoch, epochs
 class EarlyStopping:
     # YOLOv5 simple early stopper

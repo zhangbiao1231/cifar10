@@ -44,6 +44,7 @@ def imshow_cls(im, labels=None, pred=None, names=None, nmax=25, verbose=False, f
         ax[i].axis("off")
         if labels is not None:
             s = names[labels[i]] + (f"—{names[pred[i]]}" if pred is not None else "")
+            # s = f"true: {names[labels[i]]}" + "\n" + (f"pred: {names[pred[i]]}" if pred is not None else "")
             ax[i].set_title(s, fontsize=8, verticalalignment="top")
     plt.savefig(f, dpi=300, bbox_inches="tight")
     plt.close()
