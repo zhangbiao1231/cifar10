@@ -5,13 +5,13 @@
 # parent
 # ├── data
 # └── datasets
-#     └── cifar-10  ← downloads here
+#     └── cifar10  ← downloads here
 
 # Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
-path: ../datasets/cifar-10_tiny # dataset root dir
-train: train # train images (relative to 'path') 1,000 images
+path: ../datasets/cifar10 # dataset root dir
+train: train # train images (relative to 'path') 50,000 images
 val:   # test images (optional)
-test: test # test images (relative to 'path') 5 images
+test: test # test images (relative to 'path') 10,000 images
 
 # Classes
 names:
@@ -27,5 +27,5 @@ names:
   9: truck
 
 # Download script/URL (optional)
-download: http://d2l-data.s3-accelerate.amazonaws.com/cifar-10_tiny.zip
+download: data/scripts/get_cifar10.sh
 

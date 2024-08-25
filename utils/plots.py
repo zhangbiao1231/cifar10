@@ -17,9 +17,9 @@ from PIL import Image, ImageDraw
 from scipy.ndimage.filters import gaussian_filter1d
 from ultralytics.utils.plotting import Annotator
 
-from utils import TryExcept, threaded
+# from utils import TryExcept, threaded
 from utils.general import LOGGER, increment_path
-from utils.metrics import fitness
+# from utils.metrics import fitness
 
 # Settings
 RANK = int(os.getenv("RANK", -1))

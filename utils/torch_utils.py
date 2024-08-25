@@ -52,13 +52,13 @@ def smartCrossEntropyLoss(label_smoothing=0.0):
 def reshape_classifier_output(model, n=1000):
     """Reshapes last layer of model to match class count 'n', supporting Classify, Linear, Sequential types."""
     # TODO 模型搭建
-    from models.common import Classify
+    # from models.common import Classify
 
     name, m = list((model.model if hasattr(model, "model") else model).named_children())[-1]  # last module
-    if isinstance(m, Classify):  # YOLOv5 Classify() head
-        if m.linear.out_features != n:
-            m.linear = nn.Linear(m.linear.in_features, n)
-    elif isinstance(m, nn.Linear):  # ResNet, EfficientNet
+    # if isinstance(m, Classify):  # YOLOv5 Classify() head
+    #     if m.linear.out_features != n:
+    #         m.linear = nn.Linear(m.linear.in_features, n)
+    if isinstance(m, nn.Linear):  # ResNet, EfficientNet
         if m.out_features != n:
             setattr(model, name, nn.Linear(m.in_features, n))
     elif isinstance(m, nn.Sequential):

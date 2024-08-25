@@ -53,7 +53,7 @@ RANK = int(os.getenv("RANK", -1))
 
 # Settings
 NUM_THREADS = min(8, max(1, os.cpu_count() - 1))  # number of YOLOv5 multiprocessing threads
-DATASETS_DIR = Path(os.getenv("YOLOv5_DATASETS_DIR", ROOT / "data/datasets/cifar-10"))  # global datasets directory
+DATASETS_DIR = Path(os.getenv("YOLOv5_DATASETS_DIR", ROOT / "data/datasets"))  # global datasets directory
 AUTOINSTALL = str(os.getenv("YOLOv5_AUTOINSTALL", True)).lower() == "true"  # global auto-install mode
 VERBOSE = str(os.getenv("YOLOv5_VERBOSE", True)).lower() == "true"  # global verbose mode
 TQDM_BAR_FORMAT = "{l_bar}{bar:10}{r_bar}"  # tqdm bar format
@@ -70,7 +70,7 @@ os.environ["TORCH_CPP_LOG_LEVEL"] = "ERROR"  # suppress "NNPACK.cpp could not in
 os.environ["KINETO_LOG_LEVEL"] = "5"  # suppress verbose PyTorch profiler output when computing FLOPs
 
 
-LOGGING_NAME = "cifar-10"
+LOGGING_NAME = "cifar10"
 
 def set_logging(name=LOGGING_NAME, verbose=True):
     """Configures logging with specified verbosity; `name` sets the logger's name, `verbose` controls logging level."""
@@ -301,3 +301,26 @@ def git_describe(path=ROOT):
         return check_output(f"git -C {path} describe --tags --long --always", shell=True).decode()[:-1]
     except Exception:
         return ""
+class Profile(contextlib.ContextDecorator):
+    # YOLOv5 Profile class. Usage: @Profile() decorator or 'with Profile():' context manager
+    def __init__(self, t=0.0, device: torch.device = None):
+        """Initializes a profiling context for YOLOv5 with optional timing threshold and device specification."""
+        self.t = t
+        self.device = device
+        self.cuda = bool(device and str(device).startswith("cuda"))
+
+    def __enter__(self):
+        """Initializes timing at the start of a profiling context block for performance measurement."""
+        self.start = self.time()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        """Concludes timing, updating duration for profiling upon exiting a context block."""
+        self.dt = self.time() - self.start  # delta-time
+        self.t += self.dt  # accumulate dt
+
+    def time(self):
+        """Measures and returns the current time, synchronizing CUDA operations if `cuda` is True."""
+        if self.cuda:
+            torch.cuda.synchronize(self.device)
+        return time.time()
