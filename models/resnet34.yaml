@@ -1,0 +1,22 @@
+# Ultralytics YOLOv5 🚀, AGPL-3.0 license
+
+# Parameters
+nc: 120 # number of classes
+# YOLOv5 v6.0 backbone
+backbone:
+  # [from, number, module, args]
+  [
+    [-1, 1, Conv, [64, 7, 2, 3]], # 0
+    [-1, 1, nn.MaxPool2d, [3, 2, 1]],
+    [-1, 3, Layer, [64, 1]], # 2
+    [-1, 4, Layer, [128, [2, 1]]], # 3
+    [-1, 6, Layer, [256, [2, 1]]], # 4
+    [-1, 3, Layer, [512, [2, 1]]], # 5
+    [-1, 1, nn.AdaptiveAvgPool2d, [1]],
+    [-1, 1, Linear, [1000]], # 7
+  ]
+
+# YOLOv5 v6.0 head
+head: [
+    [-1, 1, Classify, [120]], # 8
+  ]

@@ -28,7 +28,7 @@ def attempt_load(weights, device=None, inplace=True, fuse=True):
 
     Example inputs: weights=[a,b,c] or a single model weights=[a] or weights=a.
     """
-    from models.yolo import Model #TODO
+    from models.classify import Model #TODO
 
     model = Ensemble()
     for w in weights if isinstance(weights, list) else [weights]:
