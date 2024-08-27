@@ -324,3 +324,8 @@ class Profile(contextlib.ContextDecorator):
         if self.cuda:
             torch.cuda.synchronize(self.device)
         return time.time()
+def intersect_dicts(da, db, exclude=()):
+    """Returns intersection of `da` and `db` dicts with matching keys and shapes, excluding `exclude` keys; uses `da`
+    values.
+    """
+    return {k: v for k, v in da.items() if k in db and all(x not in k for x in exclude) and v.shape == db[k].shape}

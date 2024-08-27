@@ -65,17 +65,15 @@ class Linear(nn.Module):
 class Classify(nn.Module):
     # YOLOv5 classification head, i.e. x(b,c1,20,20) to x(b,c2)
     def __init__(
-        self, c1, c2
+        self, c1, c2 #TODO 可以根据情况修改模型
     ):  # ch_in, ch_out, kernel, stride, padding, groups, dropout probability
         """Initializes YOLOv5 classification head with convolution, pooling, and dropout layers for input to output
         channel transformation.
         """
         super().__init__()
-        c_ = 256  # efficientnet_b0 size
-        self.fc1 = nn.Linear(c1, c_)  # to x(c1,c_)
-        self.fc2 = nn.Linear(c_, c2)  # to x(c_,c2)
+        self.fc = nn.Linear(c1, c2)  # to x(c1,c2)
 
     def forward(self, x):
         """Processes input through conv, pool, drop, and linear layers; supports list concatenation input."""
-        return self.fc2(self.fc1(x))
+        return self.fc(x)
 

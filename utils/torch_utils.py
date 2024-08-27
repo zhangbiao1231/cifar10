@@ -51,7 +51,6 @@ def smartCrossEntropyLoss(label_smoothing=0.0):
     return nn.CrossEntropyLoss()
 def reshape_classifier_output(model, n=1000):
     """Reshapes last layer of model to match class count 'n', supporting Classify, Linear, Sequential types."""
-    # TODO 模型搭建
     # from models.common import Classify
 
     name, m = list((model.model if hasattr(model, "model") else model).named_children())[-1]  # last module
@@ -286,7 +285,7 @@ def smart_resume(ckpt, optimizer, ema=None, weights="yolov5s.pt", epochs=300, re
             f"Start a new training without --resume, i.e. 'python train.py --weights {weights}'"
         )
         LOGGER.info(f"Resuming training from {weights} from epoch {start_epoch} to {epochs} total epochs")
-    if epochs < start_epoch:
+    if epochs <= start_epoch:
         LOGGER.info(f"{weights} has been trained for {start_epoch} epochs. Fine-tuning for {epochs} more epochs.")
         epochs += start_epoch  # finetune additional epochs
     return best_fitness, start_epoch, epochs
@@ -348,4 +347,32 @@ class ModelEMA:
         default.
         """
         copy_attr(self.ema, model, include, exclude)
+class EarlyStopping:
+    # YOLOv5 simple early stopper
+    def __init__(self, patience=30, min_delta=0.01):
+        """Initializes simple early stopping mechanism for YOLOv5, with adjustable patience for non-improving epochs."""
+        self.best_fitness = 0.0  # i.e. mAP
+        self.best_epoch = 0
+        self.patience = patience or float("inf")  # epochs to wait after fitness stops improving to stop
+        self.possible_stop = False  # possible stop may occur next epoch
+        self.min_delta = min_delta
+
+    def __call__(self, epoch, fitness):
+        """Evaluates if training should stop based on fitness improvement and patience, returning a boolean."""
+        if fitness > self.best_fitness +self.min_delta:  # >= 0+0.01 to allow for early zero-fitness stage of training
+            self.best_epoch = epoch
+            self.best_fitness = fitness
+        # self.best_fitness <= fitness-self.min_delta
+        delta = epoch - self.best_epoch  # epochs without improvement
+        self.possible_stop = delta >= (self.patience - 1)  # possible stop may occur next epoch
+        stop = delta >= self.patience # stop training if patience exceeded
+        if stop:
+            LOGGER.info(
+                f"Stopping training early as no improvement observed in last {self.patience} epochs. "
+                f"Best results observed at epoch {self.best_epoch}, best model saved as best.pt.\n"
+                f"To update EarlyStopping(patience={self.patience}) pass a new patience value, "
+                f"i.e. `python train.py --patience 300` or use `--patience 0` to disable EarlyStopping."
+            )
+        return stop
+
 

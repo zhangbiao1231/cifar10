@@ -83,6 +83,7 @@ def run(
         save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
         save_dir.mkdir(parents=True, exist_ok=True)  # make dir
         csv = save_dir / "results.csv"
+        submission=save_dir / "submission.csv"
 
 
         # Load model
@@ -92,7 +93,6 @@ def run(
         ckpt = (ckpt["model"]).to(device).float()  # FP32 model
         model.append(ckpt.eval())
         model = model[-1]
-
 
         # Dataloader
         data = Path(data)
@@ -110,7 +110,7 @@ def run(
     model.eval()
     pred, targets, loss, dt = [], [], 0, (Profile(device=device), Profile(device=device), Profile(device=device))
     n = len(dataloader)  # number of batches
-    action = "validating" if dataloader.dataset.root.stem.split('/')[-1] == "validate" else "testing"
+    action = "validating" if dataloader.dataset.root.stem.split('/')[-1] == "valid" else "testing"
     desc = f"{pbar.desc[:-36]}{action:>36}" if pbar else f"{action}"
     bar = tqdm(dataloader, desc, n, not training, bar_format=TQDM_BAR_FORMAT, position=0)
     with torch.cuda.amp.autocast(enabled=device.type != "cpu"):
@@ -125,7 +125,7 @@ def run(
                 pred.append(y.argsort(1, descending=True)[:, :5])
                 targets.append(labels)
                 if criterion:
-                    loss += criterion(y, labels).sum() / len(labels)
+                    loss += criterion(y, labels).sum()
 
     loss /= n
     pred, targets = torch.cat(pred), torch.cat(targets)
@@ -169,7 +169,7 @@ def parse_opt():
     """Parses and returns command line arguments for YOLOv5 model evaluation and inference settings."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, default=ROOT / "data/datasets/cifar10/train_valid_test", help="dataset path")
-    parser.add_argument("--weights", nargs="+", type=str, default=ROOT / "runs/train-cls/exp2/weights/last.pt", help="model.pt path(s)")
+    parser.add_argument("--weights", nargs="+", type=str, default=ROOT / "runs/train-cls/exp34/weights/last.pt", help="model.pt path(s)")
     parser.add_argument("--batch-size", type=int, default=128, help="batch size")
     parser.add_argument("--imgsz", "--img", "--img-size", type=int, default=32, help="inference size (pixels)")
     parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu")

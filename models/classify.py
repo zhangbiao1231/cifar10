@@ -1,8 +1,6 @@
-import yaml
-import torch.nn as nn
+
 import argparse
 import contextlib
-import math
 import os
 import platform
 import sys
@@ -24,9 +22,7 @@ from utils.plots import feature_visualization
 from utils.torch_utils import (
     initialize_weights,
     model_info,
-    profile,
     select_device,
-    time_sync,
 )
 
 try:
@@ -108,6 +104,35 @@ class ResNet(BaseModel):
 
 Model = ResNet # retain YOLOv5 'Model' class for backwards compatibility
 
+class ClassificationModel(BaseModel):
+    # YOLOv5 classification model
+    def __init__(self, cfg=None, model=None, nc=1000, cutoff=10):
+        """Initializes YOLOv5 model with config file `cfg`, input channels `ch`, number of classes `nc`, and `cuttoff`
+        index.
+        """
+        super().__init__()
+        self._from_resnet_model(model, nc, cutoff) if model is not None else self._from_yaml(cfg)
+
+    def _from_resnet_model(self, model, nc=1000, cutoff=10):
+        """Creates a classification model from a YOLOv5 detection model, slicing at `cutoff` and adding a classification
+        layer.
+        """
+        model.model = model.model[:cutoff]  # backbone
+        m = model.model[-1]  # last layer
+        ch = m.in_features  # ch into module #TODO 可以根据情况修改
+        # ch = m.conv.in_channels if hasattr(m, "conv") else m.cv1.conv.in_channels  # ch into module
+        c = Classify(ch, nc)  # Classify()
+        c.i, c.f, c.type = m.i, m.f, "models.common.Classify"  # index, from, type
+        model.model[-1] = c  # replace
+        self.model = model.model
+        # self.stride = model.stride
+        self.save = []
+        self.nc = nc
+
+    def _from_yaml(self, cfg):
+        """Creates a YOLOv5 classification model from a specified *.yaml configuration file."""
+        self.model = None
+
 def parse_model(d, ch):
     """Parses a YOLOv5 model from a dict `d`, configuring layers based on input channels `ch` and model architecture."""
     LOGGER.info(f"\n{'':>3}{'from':>18}{'n':>3}{'params':>10}  {'module':<40}{'arguments':<30}")
@@ -125,6 +150,7 @@ def parse_model(d, ch):
                  Conv,
                  Layer,
                  Classify,
+                 nn.Linear,
         }:
             c1, c2 = ch[f], args[0]
             args = [c1, c2, *args[1:]]
@@ -149,7 +175,7 @@ def parse_model(d, ch):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cfg", type=str, default=ROOT / "resnet34.yaml", help="model.yaml")
+    parser.add_argument("--cfg", type=str, default=ROOT / "resnet18.yaml", help="model.yaml")
     parser.add_argument("--batch-size", type=int, default=16, help="total batch size for all GPUs")
     parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu")
     parser.add_argument("--profile", action="store_true", help="profile model speed")
@@ -163,5 +189,8 @@ if __name__ == "__main__":
     # Create model
     im = torch.zeros((opt.batch_size, 3, 224, 224)).to(device)
     model = Model(opt.cfg).to(device)
-    print(model)
+    print(model.model[-4:-1])
     print(model(im).shape)
+    net = ClassificationModel(cfg = None, model = model, nc = 10, cutoff = 9)
+    print(net.model[-1])
+    print(net(im).shape)

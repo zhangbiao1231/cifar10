@@ -13,27 +13,27 @@ backbone:
       [ -1, 2, Layer, [256, [2, 1]]], # 4
       [ -1, 2, Layer, [512, [2, 1]]], # 5
       [ -1, 1, nn.AdaptiveAvgPool2d, [1]],
-      [ -1, 1, Linear, [1000] ], # 7
+      [ -1, 1, nn.Flatten, [1] ],
+      [ -1, 1, nn.Linear, [1000]], # 8
     ]
 # YOLOv5 v6.0 head
 head: [
-    [-1, 1, Classify, [10]], # 8
+    [-1, 1, nn.Linear, [256]], # 9
+    [-1, 1, nn.Linear, [10]], # 10
   ]
 
-"""
-  [
-    [-1, 1, nn.Conv2d, [64, 7, 2, 3]], # 0
-    [-1, 1, nn.BatchNorm2d, [64]],
-    [-1, 1, nn.ReLU, []],
-    [-1, 1, nn.MaxPool2d, [3, 2, 1]],
-    [-1, 2, BasicBlock, [64, 1]], # 4
-    [-1, 1, BasicBlock, [128, 2]], # 5
-    [-1, 1, BasicBlock, [128, 1]], # 6
-    [-1, 1, BasicBlock, [256, 2]], # 7
-    [-1, 1, BasicBlock, [256, 1]], # 8
-    [-1, 1, BasicBlock, [512, 2]], # 9
-    [-1, 1, BasicBlock, [512, 1]], # 10
-    [-1, 1, nn.AdaptiveAvgPool2d, [1]],
-    [-1, 1, Linear, [10]], # 12
-  ]
-"""
+# [
+#    [-1, 1, nn.Conv2d, [64, 7, 2, 3]], # 0
+#    [-1, 1, nn.BatchNorm2d, [64]],
+#    [-1, 1, nn.ReLU, []],
+#    [-1, 1, nn.MaxPool2d, [3, 2, 1]],
+#    [-1, 2, BasicBlock, [64, 1]], # 4
+#    [-1, 1, BasicBlock, [128, 2]], # 5
+#    [-1, 1, BasicBlock, [128, 1]], # 6
+#    [-1, 1, BasicBlock, [256, 2]], # 7
+#    [-1, 1, BasicBlock, [256, 1]], # 8
+#    [-1, 1, BasicBlock, [512, 2]], # 9
+#    [-1, 1, BasicBlock, [512, 1]], # 10
+#    [-1, 1, nn.AdaptiveAvgPool2d, [1]],
+#    [-1, 1, Linear, [10]], # 12
+#  ]
