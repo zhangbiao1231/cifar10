@@ -157,7 +157,7 @@ def train(opt,device):
                 model = torchvision.models.__dict__[opt.model](weights=None)
                 reshape_classifier_output(model, nc)  # update class count
             else:
-                model = Model(cfg= cfg, ch=3, nc=nc).to(device)  # create
+                model = Model(cfg= cfg, ch=3, nc=nc,opt=opt).to(device)  # create
             model = ClassificationModel(cfg = None, model = model, nc = nc, cutoff = 9)
             # print(model)
 
@@ -300,7 +300,7 @@ def train(opt,device):
     # Train complete
     if RANK in {-1, 0} and final_epoch or stop:
         LOGGER.info(
-            f"\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.",
+            f"\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours."
             # f'\nTraining complete ({(time.time() - t0) / 3600:.3f} hours)'
             f"\nResults saved to {colorstr('bold', save_dir)}"
             f'\nPredict:         python predict.py --weights {best} --source im.jpg'
@@ -318,14 +318,14 @@ def train(opt,device):
         # meta = {"epochs": epochs, "top1_acc": best_fitness, "date": datetime.now().isoformat()}
         logger.log_images(file, name="Test Examples (true-predicted)", epoch=epoch)
         # logger.log_model(best, epochs, metadata=meta)
-
 def parse_opt(known=False):
     """Parses command line arguments for YOLOv5 training including model path, dataset, epochs, and more, returning
     parsed arguments.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="", help="initial weights path")
-    parser.add_argument("--weights", nargs="+", type=str,default=ROOT / "runs/train-cls/exp35/weights/last.pt",
+    parser.add_argument("--weights", nargs="+", type=str,default="",
+    # ROOT / "runs/train-cls/exp37/weights/last.pt",
     help="model.pt path(s)")
     parser.add_argument("--cfg", type=str, default=ROOT /  "models/resnet18.yaml", help="model.yaml path")
     parser.add_argument("--data", type=str, default="cifar10", help="cifar100, mnist, imagenet, ...")

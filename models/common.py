@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from astropy.utils.masked.function_helpers import insert
 from keras.src.utils.module_utils import torchvision
 
 
@@ -22,19 +23,20 @@ class Layer(nn.Module):
         convolutions, and expansion.
         """
         super().__init__()
-        s = s if isinstance(s, list) else [s]
-        if len(s) == 1:
-            self.m = nn.Sequential(*(BasicBlock(c1, c2, s[-1]) for _ in range(n)))
-        else:
-            self.m = nn.Sequential(BasicBlock(c1, c2, s[0]),
-                                  *(BasicBlock(c2, c2, s[-1]) for _ in range(n-1)))
+        s = s if isinstance(s, list) else [s]*n #1 -> [1,1] [2,1]
+        if len(s) < n:
+            for x in [s[-1]]*(n-len(s)):
+                s.insert(2,x)
+        self.m = nn.Sequential(*(BasicBlock(c1, c2, idx, s) for idx,s in enumerate(s)))
+
     def forward(self, x):
         """Performs forward propagation using concatenated outputs from two convolutions and a Bottleneck sequence."""
         return self.m(x)
 # 定义一个简单的ResNet Block类
 class BasicBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, idx, stride=1):
         super(BasicBlock, self).__init__()
+        in_channels = in_channels if idx==0 else out_channels
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
@@ -42,16 +44,16 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(out_channels)
 
         if stride != 1 or in_channels != out_channels:
-            self.shortcut = nn.Sequential(
+            self.downsample = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride),
                 nn.BatchNorm2d(out_channels)
             )
         else:
-            self.shortcut = nn.Identity()
+            self.downsample = nn.Identity()
     def forward(self, x):
         out = self.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
-        out += self.shortcut(x)
+        out += self.downsample(x)
         out = self.relu(out)
         return out
 

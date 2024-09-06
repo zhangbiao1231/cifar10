@@ -169,7 +169,7 @@ def parse_opt():
     """Parses and returns command line arguments for YOLOv5 model evaluation and inference settings."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, default=ROOT / "data/datasets/cifar10/train_valid_test", help="dataset path")
-    parser.add_argument("--weights", nargs="+", type=str, default=ROOT / "runs/train-cls/exp34/weights/last.pt", help="model.pt path(s)")
+    parser.add_argument("--weights", nargs="+", type=str, default=ROOT / "runs/train-cls/exp37/weights/best.pt", help="model.pt path(s)")
     parser.add_argument("--batch-size", type=int, default=128, help="batch size")
     parser.add_argument("--imgsz", "--img", "--img-size", type=int, default=32, help="inference size (pixels)")
     parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu")

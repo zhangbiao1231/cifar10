@@ -23,3 +23,5 @@
 2. [x] 完成cutoff 功能
 1. 耐心（Patience）
 2. 最小改善量（Minimum Delta)
+
+

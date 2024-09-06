@@ -6,7 +6,7 @@ nc: 10 # number of classes
 backbone:
   # [from, number, module, args]
     [
-      [ -1, 1, Conv, [ 64, 7, 2, 3]], # 0
+      [ -1, 1, Conv, [64, 7, 2, 3]], # 0
       [ -1, 1, nn.MaxPool2d, [3, 2, 1]],
       [ -1, 2, Layer, [64, 1]], # 2
       [ -1, 2, Layer, [128, [2, 1]]], # 3

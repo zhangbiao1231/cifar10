@@ -72,7 +72,7 @@ class BaseModel(nn.Module):
         return self
 class ResNet(BaseModel):
     # YOLOv5 detection model
-    def __init__(self, cfg="resnet18.yaml", ch=3, nc=None, anchors=None):
+    def __init__(self, cfg="resnet18.yaml", ch=3, nc=None, anchors=None, opt=None):
         """Initializes YOLOv5 model with configuration file, input channels, number of classes, and custom anchors."""
         super().__init__()
         if isinstance(cfg, dict):
@@ -95,7 +95,7 @@ class ResNet(BaseModel):
 
         # Init weights, biases
         initialize_weights(self)
-        self.info()
+        self.info(img_size=opt.imgsz)
         LOGGER.info("")
 
     def forward(self, x, visualize=False):
@@ -157,6 +157,8 @@ def parse_model(d, ch):
             if m is Layer:
                 args.insert(2, n)  # number of repeats
                 n = 1
+        elif m is nn.AdaptiveAvgPool2d:
+            c2= ch[f]*args[0]**2
         else:
             c2 = ch[f]
 
@@ -170,12 +172,12 @@ def parse_model(d, ch):
         if i == 0:
             ch = []
         ch.append(c2)
-
     return nn.Sequential(*layers), sorted(save)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cfg", type=str, default=ROOT / "resnet18.yaml", help="model.yaml")
+    parser.add_argument("--imgsz", type=int, default=224, help="image size")
     parser.add_argument("--batch-size", type=int, default=16, help="total batch size for all GPUs")
     parser.add_argument("--device", default="", help="cuda device, i.e. 0 or 0,1,2,3 or cpu")
     parser.add_argument("--profile", action="store_true", help="profile model speed")
@@ -189,8 +191,8 @@ if __name__ == "__main__":
     # Create model
     im = torch.zeros((opt.batch_size, 3, 224, 224)).to(device)
     model = Model(opt.cfg).to(device)
-    print(model.model[-4:-1])
-    print(model(im).shape)
-    net = ClassificationModel(cfg = None, model = model, nc = 10, cutoff = 9)
-    print(net.model[-1])
-    print(net(im).shape)
+    print(model)
+    # print(model(im).shape)
+    # net = ClassificationModel(cfg = None, model = model, nc = 10, cutoff = 9)
+    # print(net.model[-1])
+    # print(net(im).shape)
